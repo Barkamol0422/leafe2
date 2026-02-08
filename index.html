@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>O‘simlik kasalligini aniqlash 🌿</title>
+  <style>
+    body { font-family: "Poppins", sans-serif; background: #fff; color: #222; margin: 0; padding: 20px; }
+    h1 { color: #2b005a; text-align: center; margin-bottom: 20px; }
+    #container { display: flex; max-width: 1200px; margin: 0 auto; gap: 20px; }
+    #leftPanel { flex: 0 0 350px; position: sticky; top: 20px; height: fit-content; background: #fafafa; border-radius: 20px; padding: 20px; box-shadow: 0 6px 20px rgba(0,0,0,0.1); display: flex; flex-direction: column; align-items: center; }
+    #leftPanel input, #leftPanel button { width: 100%; margin-bottom: 10px; }
+    #previewWrap img, #video { max-width: 100%; border-radius: 14px; margin-top: 15px; box-shadow: 0 3px 12px rgba(0,0,0,0.1); }
+    #canvas { display: none; }
+    #rightPanel { flex: 1; max-height: 80vh; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
+    #result { background: #fff; border-radius: 16px; padding: 20px; box-shadow: 0 3px 12px rgba(0,0,0,0.1); }
+    #suggestionsBox { text-align: left; background: #fff; padding: 20px; border-radius: 14px; box-shadow: 0 3px 12px rgba(0,0,0,0.1); }
+    button { background: #5b42f3; color: white; border: none; padding: 12px; border-radius: 30px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+    button:hover { transform: scale(1.05); box-shadow: 0 3px 10px rgba(0,0,0,0.2); }
+    @media (max-width: 900px) { #container { flex-direction: column; } #leftPanel { position: relative; top: 0; flex: none; width: 100%; } #rightPanel { max-height: none; } }
+  </style>
+</head>
+<body>
+
+<h1>🌱 O‘simlik kasalligini aniqlash</h1>
+
+<div id="container">
+<div id="leftPanel">
+<input id="fileInput" type="file" accept="image/*" />
+<button id="useCam">🎥 Kamerani yoqish</button>
+<button id="capture" disabled>📸 Suratga olish</button>
+<div id="previewWrap"></div>
+<video id="video" autoplay playsinline style="display:none;"></video>
+<canvas id="canvas"></canvas>
+</div>
+
+<div id="rightPanel">
+<div id="result">
+<h3 id="label">Natija hali yo‘q</h3>
+<p><b>Ishonchlilik:</b> <span id="confidence">-</span></p>
+<p id="advice">Iltimos, barg suratini yuklang.</p>
+</div>
+<div id="suggestionsBox" style="display:none;"></div>
+</div>
+</div>
+
+<script>
+const PLANT_API_KEY="AvySz0EQZjortie1FW3ZpnVttjh6ofCpXRGzoP1GqWLlb7guT8";
+const TREFLE_TOKEN="usr-i8nBulL3EeHEVqI8axfHTHMUYUXOmvwVIutlKyugRY0";
+const IDENTIFY_URL="https://api.plant.id/v2/identify";
+const HEALTH_URL="https://api.plant.id/v2/health_assessment";
+
+const diseaseUZ={
+  "late blight":"Kech fitofthora",
+  "early blight":"Erta fitofthora",
+  "leaf spot":"Barg dog‘lanishi",
+  "powdery mildew":"Unli chiriyotgan",
+  "downy mildew":"Soxta unli chiriyotgan",
+  "bacterial wilt":"Bakterial so‘lish",
+  "viral disease":"Virusli kasallik",
+  "rust":"Qizarish chiriyotgan",
+  "anthracnose":"Antraknoz",
+  "canker":"Qorayish yara",
+  "root rot":"Ildiz chirishi",
+  "scab":"Shamol dog‘i",
+  "mosaic virus":"Mozaika virusi",
+  "smut":"Qora chang",
+  "wilt":"So‘lish",
+  "leaf curl":"Barg burilishi",
+  "leaf spot fungal":"Qo‘ziqorinli barg dog‘i",
+  "powdery mildew fungal":"Qo‘ziqorinli unli chiriyotgan",
+  "stem rot":"Poyachiq chirishi",
+  "black spot":"Qora dog‘",
+  "downy mildew fungal":"Qo‘ziqorinli soxta unli chiriyotgan",
+  "septoria leaf spot":"Septoriya barg dog‘i",
+  "fusarium wilt":"Fuzarium so‘lish",
+  "phytophthora blight":"Fitofthora chiriyotgan",
+  "bacterial leaf spot":"Bakterial barg dog‘i",
+  "damping off":"Yangi o‘simlik chirishi",
+  "leaf mold":"Barg mog‘orlanishi",
+  "powdery mildew virus":"Unli chiriyotgan virus",
+  "cucumber mosaic virus":"Bodring mozaika virusi",
+  "tomato yellow leaf curl virus":"Pomidor sarg‘ish barg burilish virusi",
+  "apple scab":"Olma shamol dog‘i",
+  "fire blight":"Olma o‘tish chirishi",
+  "brown spot":"Jigar dog‘",
+  "downy mildew virus":"Soxta unli chiriyotgan virusi",
+  "powdery mildew disease":"Unli chiriyotgan kasallik",
+  "leaf spot bacterial":"Bakterial barg dog‘i",
+  "anthracnose disease":"Antraknoz kasalligi",
+  "septoria":"Septoriya",
+  "fusarium":"Fuzarium",
+  "verticillium wilt":"Vertisillium so‘lish",
+  "phytophthora":"Fitofthora",
+  "rhizoctonia":"Rizoctoniya",
+  "sclerotinia":"Sklerotsiniya",
+  "alternaria":"Alternariya",
+  "botrytis":"Botritis",
+  "powdery mildew fungus":"Qo‘ziqorinli unli chiriyotgan",
+  "downy mildew fungus":"Qo‘ziqorinli soxta unli chiriyotgan",
+  "clavibacter":"Klavibakter",
+  "pseudomonas":"Pseudomonas",
+  "xanthomonas":"Xantomonas",
+  "nutrient deficiency":"Oziq modda yetishmovchiligi",
+  "water excess or uneven watering":"Noto'g'ri sug'orish",
+  "dry air":"Quruq havoda qolib ketish"
+};
+
+const plantsUZ={
+  "solanum lycopersicum":"Pomidor",
+  "solanum tuberosum":"Kartoshka",
+  "malus domestica":"Olma",
+  "cucumis sativus":"Bodring",
+  "vitis vinifera":"Uzum",
+  "phaseolus vulgaris":"Loviya",
+  "brassica oleracea":"Karam",
+  "capsicum annuum":"Bulgar qalampiri",
+  "trifolium pratense":"Qizil yonqo‘rg‘a",
+  "glycine max":"So‘ya",
+  "helianthus annuus":"Quyoshguli",
+  "fragaria × ananassa":"Qulupnay",
+  "zea mays":"Makkajo‘xori",
+  "ocimum basilicum":"Rayhon",
+  "mentha spicata":"Nanа",
+  "rubus idaeus":"Malmolik",
+  "citrus sinensis":"Apelsin",
+  "pyrus communis":"Nok",
+  "allium cepa":"Piyoz",
+  "allium sativum":"Sarımsaq",
+  "brassica napus":"Kanola",
+  "carica papaya":"Papaya",
+  "prunus persica":"O‘rik",
+  "cucurbita pepo":"Qovoq",
+  "ficus carica":"Anjir",
+  "musa × paradisiaca":"Banan",
+  "arabidopsis thaliana":"Arabidopsis",
+  "solanum melongena":"Baqlajon",
+  "camellia sinensis":"Choy",
+  "fragaria vesca":"Yovvoyi qulupnay",
+  "vaccinium corymbosum":"Ko‘kberry",
+  "rubus fruticosus":"Qora murabbo",
+  "fragaria virginiana":"Qizil qulupnay",
+  "ficus benjamina":"Benjaminga",
+  "jasminum officinale":"Yorqin yasemin",
+  "lilium candidum":"Oq nilufar",
+  "rosa chinensis":"Xitoy guli",
+  "hibiscus rosa-sinensis":"Gibiskus",
+  "nelumbo nucifera":"Lotus",
+  "aquilegia vulgaris":"Akvilegiya",
+  "gerbera jamesonii":"Gerbera",
+  "chrysanthemum morifolium":"Xrizantema",
+  "pelargonium zonale":"Pelargonium",
+  "tagetes erecta":"Marigold",
+  "dahlia pinnata":"Daliya",
+  "tulipa gesneriana":"Laleler",
+  "orchis mascula":"Orkide",
+  "crocus sativus":"Zafron",
+  "narcissus pseudonarcissus":"Nartsiss",
+  "begonia semperflorens":"Begoniya",
+  "viola tricolor":"Viola",
+  "nephrolepis exaltata":"Qirqquloq"
+};
+
+function cap(s){return s?s.replace(/\b\w/g,c=>c.toUpperCase()):""}
+async function toCommon(scientific){return plantsUZ[scientific.toLowerCase()]||cap(scientific)}
+
+let currentImageFile=null,stream=null;
+const fileInput=document.getElementById("fileInput");
+const useCam=document.getElementById("useCam");
+const capture=document.getElementById("capture");
+const previewWrap=document.getElementById("previewWrap");
+const video=document.getElementById("video");
+const canvas=document.getElementById("canvas");
+const label=document.getElementById("label");
+const conf=document.getElementById("confidence");
+const advice=document.getElementById("advice");
+const box=document.getElementById("suggestionsBox");
+
+fileInput.onchange = e => {
+  currentImageFile = e.target.files[0];
+  previewWrap.innerHTML = ""; // eski rasmni o‘chiradi
+
+  const img = document.createElement("img");
+  img.src = URL.createObjectURL(currentImageFile);
+  img.onload = () => URL.revokeObjectURL(img.src);
+
+  previewWrap.appendChild(img);
+  analyze();
+};
+
+useCam.onclick=async()=>{
+  if(stream){
+    stream.getTracks().forEach(t=>t.stop());
+    stream=null;video.style.display="none";
+    capture.disabled=true;
+    useCam.textContent="🎥 Kamerani yoqish";return;
+  }
+  stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+  video.srcObject=stream;video.style.display="block";
+  capture.disabled=false;
+  useCam.textContent="⛔ Kamerani o‘chirish";
+};
+
+capture.onclick=()=>{
+  canvas.width=video.videoWidth;
+  canvas.height=video.videoHeight;
+  canvas.getContext("2d").drawImage(video,0,0);
+  canvas.toBlob(b=>{
+    currentImageFile=new File([b],"cam.png",{type:"image/png"});
+    previewWrap.innerHTML = "";
+
+  const img = document.createElement("img");
+  img.src = URL.createObjectURL(currentImageFile);
+  img.onload = () => URL.revokeObjectURL(img.src);
+
+previewWrap.appendChild(img);
+
+    analyze();
+  });
+};
+
+async function analyze(){
+  advice.textContent="Tahlil qilinmoqda...";
+  const base64=await to64(currentImageFile);
+
+  const h=await fetch(HEALTH_URL,{
+    method:"POST",
+    headers:{'Content-Type':'application/json','Api-Key':PLANT_API_KEY},
+    body:JSON.stringify({images:[base64],disease_details:["description"]})
+  }).then(r=>r.json());
+
+  const dise=h.health_assessment?.diseases||[];
+  advice.innerHTML=dise.length?"<b>Holati:</b> Kasallangan 😟":"<b>Holati:</b> Sog‘lom 🌿";
+
+  const id=await fetch(IDENTIFY_URL,{
+    method:"POST",
+    headers:{'Content-Type':'application/json','Api-Key':PLANT_API_KEY},
+    body:JSON.stringify({images:[base64]})
+  }).then(r=>r.json());
+
+  const top=id.suggestions?.[0];
+  label.textContent="O‘simlik: "+await toCommon(top?.plant_name||"Noma‘lum");
+  conf.textContent=((top?.probability||0)*100).toFixed(1)+"%";
+
+  box.style.display="block";
+  box.innerHTML="<h3>🩺 Kasalliklar:</h3>";
+  dise.forEach(d=>{
+    const raw=(d.name||d.entity_name||"Kasallik").toLowerCase();
+    const uz=diseaseUZ[raw]||cap(raw);
+    box.innerHTML+=`
+    <div style="margin-top:10px;padding:12px;background:#fff3f3;border-radius:10px">
+      <b>${uz}</b><br>
+      Ehtimollik: ${(d.probability*100).toFixed(1)}%<br>
+      ${d.description||""}
+    </div>`;
+  });
+}
+
+function to64(f){
+  return new Promise(r=>{
+    const rd=new FileReader();
+    rd.onload=()=>r(rd.result.split(",")[1]);
+    rd.readAsDataURL(f);
+  });
+}
+</script>
+</body>
+</html>
